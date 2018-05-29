@@ -39,14 +39,17 @@ To set up port forwarding, please refer to the [instructions from term 2](https:
 
 1. Clone the project repository
 ```bash
-git clone https://github.com/udacity/CarND-Capstone.git
+git clone https://github.com/mcounter/RealSDC.git
 ```
 
 2. Install python dependencies
 ```bash
-cd CarND-Capstone
+cd RealSDC
 pip install -r requirements.txt
 ```
+
+**Note:** you may need use ```sudo pip install -r requirements.txt```
+
 3. Make and run styx
 ```bash
 cd ros
