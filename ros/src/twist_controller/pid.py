@@ -1,34 +1,44 @@
 
-MIN_NUM = float('-inf')
-MAX_NUM = float('inf')
+class PIDController(object):
+    def __init__(
+        self,
+        kp, # Proportional factor
+        ki, # Integral factor
+        kd, # Differential factor
+        mn, # Minimal value of the regulator
+        mx, # Maximal value of the regulator
+        int_buffer_size # Size of the integral buffer
+        ):
 
-
-class PID(object):
-    def __init__(self, kp, ki, kd, mn=MIN_NUM, mx=MAX_NUM):
         self.kp = kp
         self.ki = ki
         self.kd = kd
-        self.min = mn
-        self.max = mx
+        self.mn = mn
+        self.mx = mx
+        self.int_buffer_size = int_buffer_size
 
-        self.int_val = self.last_error = 0.
+        self.last_error = 0.0
+        self.int_val = 0.0
+        self.int_buff = []
 
     def reset(self):
         self.int_val = 0.0
+        self.int_buff = []
 
-    def step(self, error, sample_time):
+    def step(self, error, dt):
+        self.int_val += error * dt
+        self.int_buff.append((error, dt))
+        while len(self.int_buff) > self.int_buffer_size:
+            tmp_error, tmp_dt = self.int_buff[0]
+            self.int_val -= tmp_error * tmp_dt
 
-        integral = self.int_val + error * sample_time;
-        derivative = (error - self.last_error) / sample_time;
+            del self.int_buff[0]
 
-        val = self.kp * error + self.ki * integral + self.kd * derivative;
+        derror = (error - self.last_error) / dt
 
-        if val > self.max:
-            val = self.max
-        elif val < self.min:
-            val = self.min
-        else:
-            self.int_val = integral
+        val = self.kp * error + self.ki * self.int_val + self.kd * derror
+        val = max(min(val, self.mx), self.mn)
+
         self.last_error = error
 
         return val

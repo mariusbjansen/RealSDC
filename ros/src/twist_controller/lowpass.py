@@ -1,20 +1,24 @@
 
 class LowPassFilter(object):
-    def __init__(self, tau, ts):
-        self.a = 1. / (tau / ts + 1.)
-        self.b = tau / ts / (tau / ts + 1.);
+    def __init__(
+        self,
+        samples_num): # Number of samples used for averaging
 
-        self.last_val = 0.
-        self.ready = False
+        self.a = 1.0 / (samples_num + 1.0)
+        self.b = samples_num / (samples_num + 1.0)
+
+        self.is_initialized = False
+        self.last_val = 0.0
 
     def get(self):
         return self.last_val
 
     def filt(self, val):
-        if self.ready:
+        if self.is_initialized:
             val = self.a * val + self.b * self.last_val
         else:
-            self.ready = True
+            self.is_initialized = True
 
         self.last_val = val
+        
         return val

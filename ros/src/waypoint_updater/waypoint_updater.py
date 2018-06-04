@@ -35,7 +35,7 @@ class WaypointUpdater(object):
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
 
-        self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
+        self.final_waypoints_pub = rospy.Publisher('/final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
 
@@ -99,8 +99,8 @@ class WaypointUpdater(object):
 
         return upd_lane
 
-    def pose_cb(self, msg):
-        self.hero_position = msg
+    def pose_cb(self, pose):
+        self.hero_position = pose
 
     def waypoints_cb(self, waypoints):
         # Normally is called once, but can be reinitialized if necessary
