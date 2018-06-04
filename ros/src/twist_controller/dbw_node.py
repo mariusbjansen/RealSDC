@@ -31,6 +31,12 @@ that we have created in the `__init__` function.
 
 '''
 
+# Enable for debug purpose
+# import ptvsd
+
+# ptvsd.enable_attach("my_secret", address = ('127.0.0.1', 3000))
+# ptvsd.wait_for_attach()
+
 class DBWNode(object):
     def __init__(self):
         rospy.init_node('dbw_node')
