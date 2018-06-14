@@ -1,6 +1,7 @@
 {
 	"version": "0.2.0",
 	"configurations": [
+		
 		{
 			"name": "Attach (Remote Debug)",
 			"type": "python",
@@ -43,6 +44,16 @@
 				"WaitOnNormalExit",
 				"RedirectOutput"
 			]
+		},
+		{
+    		"name": "Python Attach",
+    		"type": "python",
+    		"request": "attach",
+    		"localRoot": "${workspaceFolder}",
+    		"remoteRoot": "${workspaceFolder}",  // Set to the program location on the remote computer.
+    		"port": 3000,                   // Set to the remote port
+    		"secret": "my_secret",          // Set to your specific secret
+    		"host": "localhost"               // Set to your remote host
 		}
 	]
 }
