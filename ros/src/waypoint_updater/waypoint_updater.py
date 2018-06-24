@@ -62,7 +62,7 @@ class WaypointUpdater(object):
 
     def get_next_waypoint_idx(self, x, y):
         """
-        Return nearest next waypointfrom the list.
+        Return nearest next waypoint from the list.
         """
 
         dist, idx = self.base_waypoints_kdtree.query([x, y])

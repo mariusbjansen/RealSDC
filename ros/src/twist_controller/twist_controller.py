@@ -59,7 +59,7 @@ class Controller(object):
                 self.reset()
                 self.is_initialized = True
 
-            dv = target_dx - current_dx
+            dv = target_dx - current_dx_smooth
             dt = cur_time - self.last_time
 
             if dt >= MIN_TIME_DELTA:
