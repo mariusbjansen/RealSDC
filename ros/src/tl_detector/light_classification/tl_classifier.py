@@ -31,25 +31,40 @@ class TLClassifier(object):
         # detection call
         output = self.run_inference_for_single_image(npimage)
         
-        # only for testing/plotting -> dont introduce in ROS node
         CLASS_TRAFFIC_LIGHT = 10
-        THRESHOLD_SCORE = 0.90
+        THRESHOLD_SCORE = 0.8
                 
         boxes = output['detection_boxes']
         classes =  output['detection_classes']
         scores = output['detection_scores']
         
-        match = False
-        for i in range(len(boxes)):
-            if classes[i] == CLASS_TRAFFIC_LIGHT and scores[i] > THRESHOLD_SCORE:
-                
-                # extract/crop region of interest and plot
-                if match is False:
-                    rospy.loginfo("I found a traffic light")
-                    match = True
+        height, width = image.shape[:2]
+        idxTL = np.where(classes == CLASS_TRAFFIC_LIGHT)  
+        bestThresh = THRESHOLD_SCORE
+        match = None
+
+        for i in idxTL[0].tolist():
+            if scores[i] > THRESHOLD_SCORE and scores[i] > bestThresh:
+                match = i
+                bestThresh = scores[i]
+
         
-        if match is False:
-            rospy.loginfo("No traffic light")
+        if match is not None:
+            # extract/crop region of interest and plot
+            right_y = int(boxes[match][0]*height)
+            left_y = int(boxes[match][2]*height)
+            left_x = int(boxes[match][1]*width)
+            right_x = int(boxes[match][3]*width)
+                  
+            roi = image[right_y:left_y, left_x:right_x]
+            
+            result = self.red_green_yellow(roi)
+            
+            outstring = "I found a traffic light which is: " + result
+            rospy.loginfo(outstring)
+        else:
+            rospy.loginfo("No traffic light detected")
+            
 
         return None
     
@@ -102,3 +117,64 @@ class TLClassifier(object):
                 return output_dict
         
         return output_dict
+
+    def findNonZero(self, image_in):
+      rows, cols, _ = image_in.shape
+      counter = 0
+    
+      for row in range(rows):
+        for col in range(cols):
+          pixel = image_in[row, col]
+          if sum(pixel) != 0:
+            counter = counter + 1
+    
+      return counter
+
+    # Taken and adapted from: https://github.com/thedch/traffic-light-classifier?files=1
+    def red_green_yellow(self, image_in):
+      hsv = cv2.cvtColor(image_in, cv2.COLOR_BGR2HSV)
+
+      sum_saturation = np.sum(hsv[:,:,1]) # Sum the brightness values
+      height, width = hsv.shape[:2] 
+      area = height*width
+      avg_saturation = sum_saturation / area # Find the average
+      print('avg_saturation', avg_saturation)
+    
+      sat_low = 160
+      val_low = 140
+    
+      # Amazing website http://mkweb.bcgsc.ca/color-summarizer/ helped me to find the correct values
+      # Note the H values are from 0-360 on the website and 0-180 in opencv
+      # also S and V are from 0-100 on the website and 0-255 in opencv
+    
+      # Red
+      lower_red = np.array([0,sat_low,val_low])
+      upper_red = np.array([10,255,255])
+      red_mask = cv2.inRange(hsv, lower_red, upper_red)
+      red_result = cv2.bitwise_and(image_in, image_in, mask = red_mask)
+      sum_red = self.findNonZero(red_result)  
+      lower_red = np.array([170,sat_low,val_low])
+      upper_red = np.array([179,255,255])
+      red_mask = cv2.inRange(hsv, lower_red, upper_red)
+      red_result = cv2.bitwise_and(image_in, image_in, mask = red_mask)  
+      sum_red += self.findNonZero(red_result)
+    
+      # Yellow
+      lower_yellow = np.array([20,sat_low,val_low])
+      upper_yellow = np.array([40,255,255])
+      yellow_mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
+      yellow_result = cv2.bitwise_and(image_in, image_in, mask = yellow_mask)
+      sum_yellow = self.findNonZero(yellow_result)
+      
+      # Green
+      lower_green = np.array([50,sat_low,val_low])
+      upper_green = np.array([70,255,255])
+      green_mask = cv2.inRange(hsv, lower_green, upper_green)
+      green_result = cv2.bitwise_and(image_in, image_in, mask = green_mask)
+      sum_green = self.findNonZero(green_result)
+    
+      if (sum_red >= sum_yellow) and (sum_red >= sum_green):
+        return 'RED'
+      if sum_yellow >= sum_green:
+        return 'YELLOW' 
+      return 'GREEN' 
