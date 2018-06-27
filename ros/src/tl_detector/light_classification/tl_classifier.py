@@ -16,19 +16,18 @@ pb_name = 'ssd_mobilenet_v1_coco_2017_11_17.pb'
 pb_path = os.path.join(tl_path, lc_path, pb_name)
 
 
-### PARAMETER SECTION ###
-## traffic light DETECTION ##
+### PARAMETER SECTION BEGIN ###
+## traffic light detection ##
 # class of traffic light (no need to change)
 CLASS_TRAFFIC_LIGHT = 10
 # confidence threshold when to accept/reject traffic light match
 THRESHOLD_SCORE = 0.8
 
-## color CLASSIFICATION
+## color classification
 # reminder HSV (Hue, Saturation, Value)
 # amazing website http://mkweb.bcgsc.ca/color-summarizer/ helped me to find the values
 # Note the H values are from 0-360 on the website and 0-180 in opencv
 # also S and V are from 0-100 on the website and 0-255 in opencv
-
 # minumum Saturation of HSV color space
 SAT_LOW = 160
 # minimum Value of HSV color space
@@ -50,6 +49,12 @@ HUE_GREEN_MIN = 50
 # maximum hue green area
 HUE_GREEN_MAX = 70
 
+## ground truth for training
+TRAINING = False # Set to True if you want examples to train
+TRAIN_ROOT = '/home/student/train'
+### PARAMETER SECTION END ###
+
+
 class TLClassifier(object):
     def __init__(self):
         self.detection_graph = tf.Graph()
@@ -64,48 +69,67 @@ class TLClassifier(object):
         self.setup = False
         self.tensor_dict = None
         self.image_tensor = None
+        self.cnt = long(0)
 
-    def get_classification(self, image):
-        
-        cvimage = image[...,::-1]
-        (im_height, im_width) = cvimage.shape[:2]
-        npimage = np.array(cvimage.reshape(im_height, im_width, 3)).astype(np.uint8)      
-        
-        # detection call
-        output = self.run_inference_for_single_image(npimage)
-                
-        boxes = output['detection_boxes']
-        classes =  output['detection_classes']
-        scores = output['detection_scores']
-        
-        height, width = image.shape[:2]
-        idxTL = np.where(classes == CLASS_TRAFFIC_LIGHT)  
-        bestThresh = THRESHOLD_SCORE
-        match = None
+        # user info: you may delete the train folder itself but not individual folders inside!
+        if TRAINING is True and os.path.isdir(TRAIN_ROOT) is False:
+            f0 = os.path.join(TRAIN_ROOT,'0')
+            f1 = os.path.join(TRAIN_ROOT,'1')
+            f2 = os.path.join(TRAIN_ROOT,'2')
+            os.mkdir(TRAIN_ROOT)
+            os.mkdir(f0)
+            os.mkdir(f1)
+            os.mkdir(f2)
 
-        for i in idxTL[0].tolist():
-            if scores[i] > THRESHOLD_SCORE and scores[i] > bestThresh:
-                match = i
-                bestThresh = scores[i]
-
+    def get_classification(self, image, light):
         
-        if match is not None:
-            # extract/crop region of interest and plot
-            right_y = int(boxes[match][0]*height)
-            left_y = int(boxes[match][2]*height)
-            left_x = int(boxes[match][1]*width)
-            right_x = int(boxes[match][3]*width)
-                  
-            roi = image[right_y:left_y, left_x:right_x]
-            
-            result = self.red_green_yellow(roi)
-            
-            outstring = "Traffic light status: " + result
-            rospy.loginfo(outstring)
+        if TRAINING is True:
+            tl_status = str(light.state)
+            ext = ".png"
+            filename = str(self.cnt)+ext
+            path = os.path.join(TRAIN_ROOT,tl_status,filename)
+            cv2.imwrite(path,image)
+            self.cnt+=1
+        
         else:
-            rospy.loginfo("No traffic light detected")
-            
-        return None
+            cvimage = image[...,::-1]
+            (im_height, im_width) = cvimage.shape[:2]
+            npimage = np.array(cvimage.reshape(im_height, im_width, 3)).astype(np.uint8)      
+
+            # detection call
+            output = self.run_inference_for_single_image(npimage)
+
+            boxes = output['detection_boxes']
+            classes =  output['detection_classes']
+            scores = output['detection_scores']
+
+            height, width = image.shape[:2]
+            idxTL = np.where(classes == CLASS_TRAFFIC_LIGHT)  
+            bestThresh = THRESHOLD_SCORE
+            match = None
+
+            for i in idxTL[0].tolist():
+                if scores[i] > THRESHOLD_SCORE and scores[i] > bestThresh:
+                    match = i
+                    bestThresh = scores[i]
+                
+            if match is not None:
+                # extract/crop region of interest and plot
+                right_y = int(boxes[match][0]*height)
+                left_y = int(boxes[match][2]*height)
+                left_x = int(boxes[match][1]*width)
+                right_x = int(boxes[match][3]*width)
+
+                roi = image[right_y:left_y, left_x:right_x]
+
+                result = self.red_green_yellow(roi)
+
+                outstring = "Traffic light status: " + result
+                rospy.loginfo(outstring)
+            else:
+                rospy.loginfo("No traffic light detected")
+
+            return None
     
     def run_inference_for_single_image(self, image):
       with self.detection_graph.as_default():
@@ -203,3 +227,5 @@ class TLClassifier(object):
       if sum_yellow >= sum_green:
         return 'YELLOW' 
       return 'GREEN' 
+
+
