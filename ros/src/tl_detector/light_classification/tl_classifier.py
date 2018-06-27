@@ -1,18 +1,61 @@
 from styx_msgs.msg import TrafficLight
-import rospy
+import rospy, rospkg
 import tensorflow as tf
 import numpy as np
 import cv2
+import os
 
-# TODO fix this absolute path
-PATH_TO_CKPT = '/home/student/RealSDC/ros/src/tl_detector/light_classification/ssd_mobilenet_v1_coco_2017_11_17.pb'
+# path setup
+rp = rospkg.RosPack()
+# get path of this package
+tl_path = rp.get_path("tl_detector")
+# get specific subfolder
+lc_path = 'light_classification'
+# frozen model name
+pb_name = 'ssd_mobilenet_v1_coco_2017_11_17.pb'
+pb_path = os.path.join(tl_path, lc_path, pb_name)
+
+
+### PARAMETER SECTION ###
+## traffic light DETECTION ##
+# class of traffic light (no need to change)
+CLASS_TRAFFIC_LIGHT = 10
+# confidence threshold when to accept/reject traffic light match
+THRESHOLD_SCORE = 0.8
+
+## color CLASSIFICATION
+# reminder HSV (Hue, Saturation, Value)
+# amazing website http://mkweb.bcgsc.ca/color-summarizer/ helped me to find the values
+# Note the H values are from 0-360 on the website and 0-180 in opencv
+# also S and V are from 0-100 on the website and 0-255 in opencv
+
+# minumum Saturation of HSV color space
+SAT_LOW = 160
+# minimum Value of HSV color space
+VAL_LOW = 140
+# minimum hue red area low
+HUE_RED_MIN1 = 0
+# maximum hue red area low
+HUE_RED_MAX1 = 10
+# minimum hue red area high
+HUE_RED_MIN2 = 170
+# maximum hue red area high
+HUE_RED_MAX2 = 179
+# minimum hue yellow area
+HUE_YELLOW_MIN = 20
+# maximum hue yellow area
+HUE_YELLOW_MAX = 40
+# minimum hue green area
+HUE_GREEN_MIN = 50
+# maximum hue green area
+HUE_GREEN_MAX = 70
 
 class TLClassifier(object):
     def __init__(self):
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
           od_graph_def = tf.GraphDef()
-          with tf.gfile.GFile(PATH_TO_CKPT, 'rb') as fid:
+          with tf.gfile.GFile(pb_path, 'rb') as fid:
             serialized_graph = fid.read()
             od_graph_def.ParseFromString(serialized_graph)
             tf.import_graph_def(od_graph_def, name='')
@@ -30,9 +73,6 @@ class TLClassifier(object):
         
         # detection call
         output = self.run_inference_for_single_image(npimage)
-        
-        CLASS_TRAFFIC_LIGHT = 10
-        THRESHOLD_SCORE = 0.8
                 
         boxes = output['detection_boxes']
         classes =  output['detection_classes']
@@ -60,12 +100,11 @@ class TLClassifier(object):
             
             result = self.red_green_yellow(roi)
             
-            outstring = "I found a traffic light which is: " + result
+            outstring = "Traffic light status: " + result
             rospy.loginfo(outstring)
         else:
             rospy.loginfo("No traffic light detected")
             
-
         return None
     
     def run_inference_for_single_image(self, image):
@@ -100,7 +139,6 @@ class TLClassifier(object):
                 self.tensor_dict['detection_masks'] = tf.expand_dims(detection_masks_reframed, 0)
               self.image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0')
               self.setup = True
-        
     
         if (self.setup == True):
             # Run inference
@@ -134,41 +172,28 @@ class TLClassifier(object):
     def red_green_yellow(self, image_in):
       hsv = cv2.cvtColor(image_in, cv2.COLOR_BGR2HSV)
 
-      sum_saturation = np.sum(hsv[:,:,1]) # Sum the brightness values
-      height, width = hsv.shape[:2] 
-      area = height*width
-      avg_saturation = sum_saturation / area # Find the average
-      print('avg_saturation', avg_saturation)
-    
-      sat_low = 160
-      val_low = 140
-    
-      # Amazing website http://mkweb.bcgsc.ca/color-summarizer/ helped me to find the correct values
-      # Note the H values are from 0-360 on the website and 0-180 in opencv
-      # also S and V are from 0-100 on the website and 0-255 in opencv
-    
       # Red
-      lower_red = np.array([0,sat_low,val_low])
-      upper_red = np.array([10,255,255])
+      lower_red = np.array([HUE_RED_MIN1,SAT_LOW,VAL_LOW])
+      upper_red = np.array([HUE_RED_MAX1,255,255])
       red_mask = cv2.inRange(hsv, lower_red, upper_red)
       red_result = cv2.bitwise_and(image_in, image_in, mask = red_mask)
       sum_red = self.findNonZero(red_result)  
-      lower_red = np.array([170,sat_low,val_low])
-      upper_red = np.array([179,255,255])
+      lower_red = np.array([HUE_RED_MIN2,SAT_LOW,VAL_LOW])
+      upper_red = np.array([HUE_RED_MAX2,255,255])
       red_mask = cv2.inRange(hsv, lower_red, upper_red)
       red_result = cv2.bitwise_and(image_in, image_in, mask = red_mask)  
       sum_red += self.findNonZero(red_result)
     
       # Yellow
-      lower_yellow = np.array([20,sat_low,val_low])
-      upper_yellow = np.array([40,255,255])
+      lower_yellow = np.array([HUE_YELLOW_MIN,SAT_LOW,VAL_LOW])
+      upper_yellow = np.array([HUE_YELLOW_MAX,255,255])
       yellow_mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
       yellow_result = cv2.bitwise_and(image_in, image_in, mask = yellow_mask)
       sum_yellow = self.findNonZero(yellow_result)
       
       # Green
-      lower_green = np.array([50,sat_low,val_low])
-      upper_green = np.array([70,255,255])
+      lower_green = np.array([HUE_GREEN_MIN,SAT_LOW,VAL_LOW])
+      upper_green = np.array([HUE_GREEN_MAX,255,255])
       green_mask = cv2.inRange(hsv, lower_green, upper_green)
       green_result = cv2.bitwise_and(image_in, image_in, mask = green_mask)
       sum_green = self.findNonZero(green_result)
