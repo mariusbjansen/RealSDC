@@ -5,6 +5,8 @@ import numpy as np
 import cv2
 import os
 
+from datetime import datetime
+
 # path setup
 rp = rospkg.RosPack()
 # get path of this package
@@ -21,7 +23,7 @@ pb_path = os.path.join(tl_path, lc_path, pb_name)
 # class of traffic light (no need to change)
 CLASS_TRAFFIC_LIGHT = 10
 # confidence threshold when to accept/reject traffic light match
-THRESHOLD_SCORE = 0.8
+THRESHOLD_SCORE = 0.7
 
 ## color classification
 # reminder HSV (Hue, Saturation, Value)
@@ -50,8 +52,9 @@ HUE_GREEN_MIN = 50
 HUE_GREEN_MAX = 70
 
 ## ground truth for training
-TRAINING = False # Set to True if you want examples to train
-TRAIN_ROOT = '/home/student/train'
+TRAINING = True # Set to True if you want examples to train
+TRAIN_ROOT = os.path.join(tl_path, '../../../../train')
+TLC_DEBUG = True
 ### PARAMETER SECTION END ###
 
 
@@ -69,67 +72,126 @@ class TLClassifier(object):
         self.setup = False
         self.tensor_dict = None
         self.image_tensor = None
-        self.cnt = long(0)
 
         # user info: you may delete the train folder itself but not individual folders inside!
-        if TRAINING is True and os.path.isdir(TRAIN_ROOT) is False:
-            f0 = os.path.join(TRAIN_ROOT,'0')
-            f1 = os.path.join(TRAIN_ROOT,'1')
-            f2 = os.path.join(TRAIN_ROOT,'2')
-            os.mkdir(TRAIN_ROOT)
-            os.mkdir(f0)
-            os.mkdir(f1)
-            os.mkdir(f2)
+        if TRAINING:
+            self.training_path_root = TRAIN_ROOT
+            self.training_path_orig = os.path.join(TRAIN_ROOT, 'orig')
+            self.training_path_boxed = os.path.join(TRAIN_ROOT, 'boxed')
+            self.training_path_tl = os.path.join(TRAIN_ROOT, 'tl')
+            self.training_tl_state_folders = {
+                TrafficLight.RED: '0 - RED',
+                TrafficLight.YELLOW: '1 - YELLOW',
+                TrafficLight.GREEN: '2 - GREEN',
+                TrafficLight.UNKNOWN: '4 - UNKNOWN'}
+
+            try:
+                os.mkdir(self.training_path_root)
+            except:
+                pass
+
+            try:
+                os.mkdir(self.training_path_orig)
+            except:
+                pass
+
+            try:
+                os.mkdir(self.training_path_boxed)
+            except:
+                pass
+
+            try:
+                os.mkdir(self.training_path_tl)
+            except:
+                pass
+
+            for state_name in self.training_tl_state_folders.values():
+                try:
+                    os.mkdir(os.path.join(self.training_path_orig, state_name))
+                except:
+                    pass
+
+                try:
+                    os.mkdir(os.path.join(self.training_path_tl, state_name))
+                except:
+                    pass
 
     def get_classification(self, image, light):
-        
-        if TRAINING is True:
-            tl_status = str(light.state)
-            ext = ".png"
-            filename = str(self.cnt)+ext
-            path = os.path.join(TRAIN_ROOT,tl_status,filename)
-            cv2.imwrite(path,image)
-            self.cnt+=1
-        
-        else:
-            cvimage = image[...,::-1]
-            (im_height, im_width) = cvimage.shape[:2]
-            npimage = np.array(cvimage.reshape(im_height, im_width, 3)).astype(np.uint8)      
+        timestamp = datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S_%f')[:-3]
 
-            # detection call
-            output = self.run_inference_for_single_image(npimage)
+        if TRAINING:
+            path = os.path.join(self.training_path_orig, self.training_tl_state_folders[light.state], '{}.png'.format(timestamp))
+            cv2.imwrite(path, image)
 
-            boxes = output['detection_boxes']
-            classes =  output['detection_classes']
-            scores = output['detection_scores']
+        cvimage = image[...,::-1]
+        (im_height, im_width) = cvimage.shape[:2]
+        npimage = np.array(cvimage.reshape(im_height, im_width, 3)).astype(np.uint8)
 
-            height, width = image.shape[:2]
-            idxTL = np.where(classes == CLASS_TRAFFIC_LIGHT)  
-            bestThresh = THRESHOLD_SCORE
-            match = None
+        # detection call
+        output = self.run_inference_for_single_image(npimage)
 
-            for i in idxTL[0].tolist():
-                if scores[i] > THRESHOLD_SCORE and scores[i] > bestThresh:
+        boxes = output['detection_boxes']
+        classes =  output['detection_classes']
+        scores = output['detection_scores']
+
+        height, width = image.shape[:2]
+        idxTL = np.where(classes == CLASS_TRAFFIC_LIGHT)  
+        bestThresh = THRESHOLD_SCORE
+        match = None
+
+        if TRAINING:
+            img_boxed = image.copy()
+
+        for i in idxTL[0].tolist():
+            if scores[i] >= THRESHOLD_SCORE:
+                if TRAINING:
+                    cv2.rectangle(img_boxed, (int(boxes[i][1] * width), int(boxes[i][0] * height)), (int(boxes[i][3] * width), int(boxes[i][2] * height)), (255, 255, 255), 3)
+
+                if scores[i] > bestThresh:
                     match = i
                     bestThresh = scores[i]
-                
-            if match is not None:
-                # extract/crop region of interest and plot
-                right_y = int(boxes[match][0]*height)
-                left_y = int(boxes[match][2]*height)
-                left_x = int(boxes[match][1]*width)
-                right_x = int(boxes[match][3]*width)
 
-                roi = image[right_y:left_y, left_x:right_x]
+        if TRAINING:
+            path = os.path.join(self.training_path_boxed, '{}.png'.format(timestamp))
+            cv2.imwrite(path, img_boxed)
 
-                result = self.red_green_yellow(roi)
+        if match is not None:
+            # extract/crop region of interest and plot
+            left_y = int(boxes[match][0]*height)
+            left_x = int(boxes[match][1]*width)
+            right_y = int(boxes[match][2]*height)
+            right_x = int(boxes[match][3]*width)
 
-                outstring = "Traffic light status: " + result
-                rospy.loginfo(outstring)
-            else:
-                rospy.loginfo("No traffic light detected")
+            roi = image[left_y:right_y, left_x:right_x]
 
-            return None
+            cur_state = self.red_green_yellow(roi)
+
+            if TLC_DEBUG:
+                state_name = "RED" if cur_state == TrafficLight.RED else "GREEN" if cur_state == TrafficLight.GREEN else "YELLOW"
+                rospy.loginfo("Traffic light status: {}".format(state_name))
+
+            if TRAINING:
+                img_w = right_x - left_x
+                img_h = right_y - left_y
+
+                max_dim = max(img_w, img_h)
+                sub_img = image[max(0, left_y + (img_h // 2) - (max_dim // 2)):max(0, left_y + (img_h // 2) - (max_dim // 2)) + max_dim, max(0, left_x + (img_w // 2) - (max_dim // 2)):max(0, left_x + (img_w // 2) - (max_dim // 2)) + max_dim]
+
+                #if (sub_img.shape[0] != max_dim) or (sub_img.shape[1] != max_dim):
+                sub_img_new = np.zeros((max_dim, max_dim, sub_img.shape[2]), dtype=np.uint8)
+                sub_img_new[max(0, (max_dim - sub_img.shape[0]) // 2):max(0, (max_dim - sub_img.shape[0]) // 2) + sub_img.shape[0], max(0, (max_dim - sub_img.shape[1]) // 2):max(0, (max_dim - sub_img.shape[1]) // 2) + sub_img.shape[1]] = sub_img
+                sub_img = sub_img_new
+
+                sub_img = cv2.resize(sub_img, (32, 32), interpolation = cv2.INTER_CUBIC)
+
+                path = os.path.join(self.training_path_tl, self.training_tl_state_folders[cur_state], '{}.png'.format(timestamp))
+                cv2.imwrite(path, sub_img)
+
+            return cur_state
+        else:
+            rospy.loginfo("No traffic light detected")
+
+        return TrafficLight.UNKNOWN
     
     def run_inference_for_single_image(self, image):
       with self.detection_graph.as_default():
@@ -223,9 +285,9 @@ class TLClassifier(object):
       sum_green = self.findNonZero(green_result)
     
       if (sum_red >= sum_yellow) and (sum_red >= sum_green):
-        return 'RED'
+        return TrafficLight.RED
       if sum_yellow >= sum_green:
-        return 'YELLOW' 
-      return 'GREEN' 
+        return TrafficLight.YELLOW
+      return TrafficLight.GREEN
 
 

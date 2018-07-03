@@ -60,22 +60,19 @@ class DBWNode(object):
             'vehicle_throttle_dead_zone' : 0.05,
         }
 
-        self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
-                                         SteeringCmd, queue_size=1)
-        self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd',
-                                            ThrottleCmd, queue_size=1)
-        self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',
-                                         BrakeCmd, queue_size=1)
-
-        self.controller = Controller(self.dbw_parameters)
-
         self.dbw_status = False
         self.hero_velocity = None
         self.target_velocity = None
 
+        self.controller = Controller(self.dbw_parameters)
+
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
         rospy.Subscriber('/twist_cmd', TwistStamped, self.target_velocity_cb)
+
+        self.steer_pub = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size=1)
+        self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size=1)
+        self.brake_pub = rospy.Publisher('/vehicle/brake_cmd', BrakeCmd, queue_size=1)
 
         self.loop()
 

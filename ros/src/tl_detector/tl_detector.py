@@ -35,6 +35,22 @@ class TLDetector(object):
         self.camera_image = None
         self.lights = []
 
+        self.is_initialized = False
+        self.base_waypoints = None
+        self.base_waypoints_kdtree = None
+
+        self.state = TrafficLight.UNKNOWN
+        self.last_state = TrafficLight.UNKNOWN
+        self.last_wp = -1
+        self.state_count = 0
+
+        self.bridge = CvBridge()
+        self.light_classifier = TLClassifier()
+        self.listener = tf.TransformListener()
+
+        config_string = rospy.get_param("/traffic_light_config")
+        self.config = yaml.load(config_string)
+
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
@@ -48,23 +64,7 @@ class TLDetector(object):
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
         sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
-        config_string = rospy.get_param("/traffic_light_config")
-        self.config = yaml.load(config_string)
-
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
-
-        self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
-        self.listener = tf.TransformListener()
-
-        self.is_initialized = False
-        self.base_waypoints = None
-        self.base_waypoints_kdtree = None
-
-        self.state = TrafficLight.UNKNOWN
-        self.last_state = TrafficLight.UNKNOWN
-        self.last_wp = -1
-        self.state_count = 0
 
         rospy.spin()
 
@@ -194,7 +194,7 @@ class TLDetector(object):
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
         
-        if bool(self.pose):
+        if self.is_initialized and bool(self.pose):
             # Waypoint corresponding to car position 
             # Necessary to check if traffic light is ahead or behind
             car_wp_idx = self.get_closest_waypoint_idx(self.pose.pose.position.x, self.pose.pose.position.y, find_next = True)
