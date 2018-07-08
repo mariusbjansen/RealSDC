@@ -22,7 +22,7 @@ TL_DEBUG = True
 STATE_COUNT_THRESHOLD = 3
 
 MIN_TL_VISIBLE_DISTANCE = 1 # Minimal TL distance when it's can be visible
-MAX_TL_VISIBLE_DISTANCE = 300 # MAximal TL distance when it's can be visible
+MAX_TL_VISIBLE_DISTANCE = 150 # MAximal TL distance when it's can be visible
 MAX_STOPLINE_DISTANCE = 50 # Maximal distance between stopline and traffic light
 NORMAL_STOPLINE_DISTANCE = 15 # Normal distance between stopline and traffic light
 
@@ -33,6 +33,8 @@ class TLDetector(object):
         self.pose = None
         self.waypoints = None
         self.camera_image = None
+        self.next_camera_images = [None, None]
+        self.next_camera_image_idx = 0
         self.lights = []
 
         self.is_initialized = False
@@ -66,7 +68,36 @@ class TLDetector(object):
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
-        rospy.spin()
+        self._main_cycle()
+
+    def _main_cycle(self):
+        while not rospy.is_shutdown():
+            if self.is_initialized and bool(self.next_camera_images[self.next_camera_image_idx]):
+                self.next_camera_image_idx = 1 - self.next_camera_image_idx
+                self.camera_image = self.next_camera_images[1 - self.next_camera_image_idx]
+                self.next_camera_images[1 - self.next_camera_image_idx] = None
+
+                light_wp, state = self.process_traffic_lights()
+
+                '''
+                Publish upcoming red lights at camera frequency.
+                Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
+                of times till we start using it. Otherwise the previous stable state is
+                used.
+                '''
+                if self.state != state:
+                    self.state_count = 0
+                    self.state = state
+                elif self.state_count >= STATE_COUNT_THRESHOLD:
+                    self.last_state = self.state
+                    light_wp = light_wp if state == TrafficLight.RED else -1
+                    self.last_wp = light_wp
+                    self.upcoming_red_light_pub.publish(Int32(light_wp))
+                else:
+                    self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+                self.state_count += 1
+                
+            rospy.sleep(0.010)
 
     def pose_cb(self, msg):
         self.pose = msg
@@ -94,27 +125,7 @@ class TLDetector(object):
 
         """
 
-        self.has_image = True
-        self.camera_image = msg
-        light_wp, state = self.process_traffic_lights()
-
-        '''
-        Publish upcoming red lights at camera frequency.
-        Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
-        of times till we start using it. Otherwise the previous stable state is
-        used.
-        '''
-        if self.state != state:
-            self.state_count = 0
-            self.state = state
-        elif self.state_count >= STATE_COUNT_THRESHOLD:
-            self.last_state = self.state
-            light_wp = light_wp if state == TrafficLight.RED else -1
-            self.last_wp = light_wp
-            self.upcoming_red_light_pub.publish(Int32(light_wp))
-        else:
-            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-        self.state_count += 1
+        self.next_camera_images[self.next_camera_image_idx] = msg
 
     def get_closest_waypoint_idx(self, x, y, find_next):
         """
@@ -162,9 +173,6 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        if(not self.has_image):
-            self.prev_light_loc = None
-            return False
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
@@ -172,8 +180,8 @@ class TLDetector(object):
         cur_tl_state = self.light_classifier.get_classification(cv_image, light)
 
         # TODO: Remove when classifier to be implemented
-        if cur_tl_state == TrafficLight.UNKNOWN:
-            cur_tl_state = light.state
+        #if cur_tl_state == TrafficLight.UNKNOWN:
+        #    cur_tl_state = light.state
 
         return cur_tl_state
 
