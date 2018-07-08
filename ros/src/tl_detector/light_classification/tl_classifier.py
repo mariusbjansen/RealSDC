@@ -14,7 +14,10 @@ tl_path = rp.get_path("tl_detector")
 # get specific subfolder
 lc_path = 'light_classification'
 # frozen model name
-pb_name = 'ssd_mobilenet_v1_coco_2017_11_17.pb'
+## Selection of newer ssd lite mobilenet v2 net pretrained with coco
+## see analysis in doc folder
+#pb_name = 'ssd_mobilenet_v1_coco_2017_11_17.pb'
+pb_name = 'ssdlite_mobilenet_v2_coco.pb'
 pb_path = os.path.join(tl_path, lc_path, pb_name)
 
 
