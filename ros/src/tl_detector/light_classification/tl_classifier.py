@@ -17,7 +17,8 @@ lc_path = 'light_classification'
 ## Selection of newer ssd lite mobilenet v2 net pretrained with coco
 ## see analysis in doc folder
 #pb_name = 'ssd_mobilenet_v1_coco_2017_11_17.pb'
-pb_name = 'ssdlite_mobilenet_v2_coco.pb'
+#pb_name = 'ssdlite_mobilenet_v2_coco.pb'
+pb_name = 'ssd_mobilenet_v2_coco_2018_03_29.pb'
 pb_path = os.path.join(tl_path, lc_path, pb_name)
 
 
