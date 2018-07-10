@@ -13,14 +13,15 @@ rp = rospkg.RosPack()
 tl_path = rp.get_path("tl_detector")
 # get specific subfolder
 lc_path = 'light_classification'
-# frozen model name
-## Selection of newer ssd lite mobilenet v2 net pretrained with coco
-## see analysis in doc folder
+# frozen model name alternatives
 #pb_name = 'ssd_mobilenet_v1_coco_2017_11_17.pb'
 #pb_name = 'ssdlite_mobilenet_v2_coco.pb'
-pb_name = 'ssd_mobilenet_v2_coco_2018_03_29.pb'
-pb_path = os.path.join(tl_path, lc_path, pb_name)
 
+# README: following pb file was to big for GitHub
+# in order to use it type "cat ssd_mobilenet_v2_coco_2018_03_29_part* > ssd_mobilenet_v2_coco_2018_03_29.pb"
+pb_name = 'ssd_mobilenet_v2_coco_2018_03_29.pb'
+
+pb_path = os.path.join(tl_path, lc_path, pb_name)
 
 ### PARAMETER SECTION BEGIN ###
 ## traffic light detection ##
