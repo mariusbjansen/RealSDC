@@ -2,8 +2,8 @@
 
 import rospy
 from geometry_msgs.msg import PoseStamped
-from styx_msgs.msg import Lane, Waypoint
-
+from styx_msgs.msg import Lane, Waypoint, TrafficLight
+from std_msgs.msg import Int32
 import math
 
 from scipy.spatial import KDTree
@@ -23,8 +23,9 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 50 # Number of waypoints we will publish. You can change this number
 FINAL_WP_PUBLISH_FREQ = 50 # Frequency of publishing of final waypoints
+MAX_DECEL = .3 #The maximum deceleration for the vehicle when trying to break before red light
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -33,17 +34,21 @@ class WaypointUpdater(object):
         self.is_initialized = False
         self.base_waypoints = None
         self.base_waypoints_kdtree = None
-
         self.hero_position = None
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
-        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+        # Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+        
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb) #arm041
 
         self.final_waypoints_pub = rospy.Publisher('/final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
+        # Add other member variables you need below 
+	    #Added by arm041
+        self.stopline_waypoint_idx = -1
+	    #End arm041
 
         self._main_cycle()
 
@@ -91,13 +96,45 @@ class WaypointUpdater(object):
         return -1
 
     def prepare_lane(self, start_idx):
-        upd_lane = Lane()
 
-        if start_idx >= 0:
-            for waypoint in self.base_waypoints[start_idx:start_idx + FINAL_WP_PUBLISH_FREQ]:
-                upd_lane.waypoints.append(waypoint)
+        upd_lane = Lane()
+        temp = []
+
+        waypoints_follow = self.base_waypoints[start_idx:start_idx + LOOKAHEAD_WPS]
+
+        #check added by arm041 to consider the possibility of red light when creating waypoints
+        if self.stopline_waypoint_idx == -1 or (self.stopline_waypoint_idx>= start_idx +  LOOKAHEAD_WPS):
+            upd_lane.waypoints = waypoints_follow
+        else:
+            upd_lane.waypoints = self.decelerate(start_idx, waypoints_follow) 
+            #temp = self.decelerate(start_idx, self.base_waypoints)
+            #for waypoint in temp:
+             #   upd_lane.waypoints.append(waypoint)
 
         return upd_lane
+
+    #added by arm041
+    def decelerate (self, start_idx, waypoints_in):
+        """
+        This function will create a lane if a traffic light is detected
+        """
+        temp = []
+        for i, wp in enumerate(waypoints_in):
+            way_point_temp = Waypoint()
+            way_point_temp.pose = wp.pose
+
+            stop_idx = max(self.stopline_waypoint_idx - start_idx - 2, 0)
+            dist = self.distance (waypoints_in, i, stop_idx)
+
+            vel = math.sqrt (2 * MAX_DECEL * dist)
+            if vel < 1: 
+                vel = 0
+        
+            way_point_temp.twist.twist.linear.x = min (vel, wp.twist.twist.linear.x)
+            temp.append(way_point_temp)
+        return temp
+
+    #end by arm041
 
     def pose_cb(self, pose):
         self.hero_position = pose
@@ -113,8 +150,9 @@ class WaypointUpdater(object):
         self.is_initialized = True
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        # Callback for /traffic_waypoint message. Implement
+	    self.stopline_waypoint_idx = msg.data #arm041
+        
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -129,7 +167,7 @@ class WaypointUpdater(object):
     def distance(self, waypoints, wp1, wp2):
         dist = 0
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-        for i in range(wp1, wp2+1):
+        for i in range(wp1, wp2+1): 
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
