@@ -7,7 +7,7 @@ This led to the subtasks
 * detect the current state of a traffic light
 
 ## Find the next stop line ahead
-For the first subtask there was already a nice tutorial called “Detection Walkthrough” on the Udacity website by Eren and Steven. The code is written in the file tl_detector.py and mainly resides in the function process_traffic_lights. The function compares the current position of the car with the planned waypoints and then checks for the next stop line corresponding to a traffic light. So eventually the interesting outcome is the distance to the next stop line.
+For the first subtask there was already a nice tutorial called “Detection Walkthrough” on the Udacity website by Eren and Steven. The code is written in the file _tl_detector.py_ and mainly resides in the function _process_traffic_lights_. The function compares the current position of the car with the planned waypoints and then checks for the next stop line corresponding to a traffic light. So eventually the interesting outcome is the distance to the next stop line.
 
 ## Detect the current state of a traffic light
 After that the traffic light state needs to be determined. The outcome of the classification (labels) are the following.
@@ -21,7 +21,7 @@ The input to this task is video data. So eventually images from the video stream
 
 <img src="traffic_light_detection_architectures.png" width=640>
 
-We looked into options b and c and finally chose tbd.
+We looked into options b and c and finally chose ![#f03c15](https://placehold.it/15/f03c15/000000?text=+) tbd.
 
 ### Traffic light detection pipeline
 
