@@ -15,13 +15,13 @@ After that the traffic light state needs to be determined. The outcome of the cl
 * red
 * yellow
 * green
-* unknown (optionally)
+* unknown
 
 The input to this task is video data. So eventually images from the video stream need to be classified. We thought of different approaches.
 
 <img src="traffic_light_detection_architectures.png" width=640>
 
-We looked into options b and c and finally chose ![#f03c15](https://placehold.it/15/f03c15/000000?text=+) tbd.
+We looked into options b and c and finally chose c.
 
 ### Traffic light detection pipeline
 
@@ -44,7 +44,7 @@ We tried out different models from the zoo
 * [ssdlite_mobilenet_v2_coco_2018_05_09](http://download.tensorflow.org/models/object_detection/ssdlite_mobilenet_v2_coco_2018_05_09.tar.gz) and 
 * [ssd_mobilenet_v2_coco_2018_03_29](http://download.tensorflow.org/models/object_detection/ssd_mobilenet_v2_coco_2018_03_29)
 
-We found sdlite_mobilenet_v2_coco_2018_05_09 is the best trade off between accuracy and speed. And happily enough already robust enough so we did not even need to perform additional training.
+We found ssdlite_mobilenet_v2_coco_2018_05_09 is the best trade off between accuracy and speed for both simulation and real data. And happily enough already robust enough so we did not even need to perform additional training.
 
 So detecting a traffic light is necessary but not sufficient. The next step is to extract the bounding box and feed it into the next stage, which has the task to determine the state (red, yellow, green) of the traffic light. We found a proposal for a solution [here](https://github.com/udacity/iSDC-P5-traffic-light-classifier-starter-code/blob/master/Traffic_Light_Classifier.ipynb) which was a project in former/future? times of the Udacity SDC Nanodegree.
 
@@ -56,7 +56,8 @@ So detecting a traffic light is necessary but not sufficient. The next step is t
 <img src="traffic_light_crop.png" height=200>
 
 #### Color Detection
-The pipeline we chose converts the image to [HSV color space](https://en.wikipedia.org/wiki/HSL_and_HSV) and then counts pixels between upper and lower thresholds of the respective H, S and V values. We used this [website of HSV image color statistics and clustering](http://mkweb.bcgsc.ca/color-summarizer/) to determine the correct thresholds for the sum of the pixels. The corresponding code is pretty simple and can be found in our code file tl_classifier.py in the function red_green_yellow.
+The pipeline we chose is again a CNN with the labels red, yellow, green and unknown. "Unknwon" can especially help to prevent false positives from the first stage (traffic light detection). We were using a low probability to accept traffic lights in order to not miss any of them in the first place.
+
 
 ##### Visualization
 <img src="traffic_light_crop.png" height=200>
@@ -67,8 +68,32 @@ COLOR = YELLOW
 
 
 #### Layout of CNN color detection of traffic lights
-![#f03c15](https://placehold.it/15/f03c15/000000?text=+) fill out or delete this line and heading line above 
+
+The layout of the network we used is as follows.
+
+| Layer | Description |
+|:-----:|:-----------:|
+| Input | 32x32x3 - Normalized image RGB |
+| Convolution 3x3 | 1x1 stride, VALID padding, outputs 30x30x32 |
+| ReLU |  |
+| AVG pooling	2x2 | 2x2 stride, outputs 15x15x32 |
+| Convolution 4x4 | 1x1 stride, VALID padding, outputs 12x12x48 |
+| ReLU |  |
+| AVG pooling	2x2 | 2x2 stride, outputs 6x6x48 |
+| Convolution 3x3 | 1x1 stride, VALID padding, outputs 4x4x64 |
+| ReLU |  |
+| Dropout | Probability of dropout 50% |
+| Fully connected	| 1024x300 |
+| ReLU |  |
+| Dropout | Probability of dropout 50% |
+| Fully connected	| 300x200 |
+| ReLU |  |
+| Dropout | Probability of dropout 50% |
+| Output layer | 200x43 (number of classes) |
+| Softmax | 	|
+| Model loss | Model loss is calculated as sum of Cross-entropy averaged by whole training batch and L2-loss calculated for each weight in fully-connected layers and multiplied by fixed regularization factor	|
+
+Dropouts were used between fully-connected layers and after last convolutional layers. Any dropouts between convolutional layers decreased model performance, so it was not used at all.
 
 
 This concludes the description of the traffic light detection and color classification pipeline.
-
