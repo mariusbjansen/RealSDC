@@ -44,7 +44,7 @@ We tried out different models from the zoo
 * [ssdlite_mobilenet_v2_coco_2018_05_09](http://download.tensorflow.org/models/object_detection/ssdlite_mobilenet_v2_coco_2018_05_09.tar.gz) and 
 * [ssd_mobilenet_v2_coco_2018_03_29](http://download.tensorflow.org/models/object_detection/ssd_mobilenet_v2_coco_2018_03_29)
 
-We found ssdlite_mobilenet_v2_coco_2018_05_09 is the best trade off between accuracy and speed for both simulation and real data. And happily enough already robust enough so we did not even need to perform additional training.
+We found ssd_mobilenet_v1_coco_2017_11_17 is the best trade off between accuracy and speed for both simulation and real data. And happily enough already robust enough so we did not even need to perform additional training.
 
 So detecting a traffic light is necessary but not sufficient. The next step is to extract the bounding box and feed it into the next stage, which has the task to determine the state (red, yellow, green) of the traffic light. We found a proposal for a solution [here](https://github.com/udacity/iSDC-P5-traffic-light-classifier-starter-code/blob/master/Traffic_Light_Classifier.ipynb) which was a project in former/future? times of the Udacity SDC Nanodegree.
 
