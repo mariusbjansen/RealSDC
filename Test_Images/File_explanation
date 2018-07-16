@@ -1,0 +1,24 @@
+There are 4 groups of files:
+
+The first group has SIMULATOR images NOT augmented:
+    0 - RED
+    1 - YELLOW
+    2 - GREEN
+    4 - UNKNOWN
+
+The second group has REAL images NOT augmented:
+    Real 0 - RED
+    Real 1 - YELLOW
+    Real 2 - GREEN
+    Real 4 - UNKNOWN
+    
+Thet Third group has SIMULATOR images AUGMENTED:
+    Augmented_Anex_0 - RED
+    Augmented_Anex_1 - YELLOW
+    Augmented_Anex_2 - GREEN
+    
+Thet Fourth group has REAL images AUGMENTED:
+    Augmented_Anex_Real_0 - RED
+    Augmented_Anex_Real_1 - YELLOW
+    Augmented_Anex_Real_2 - GREEN
+   
