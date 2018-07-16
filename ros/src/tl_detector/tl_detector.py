@@ -21,8 +21,8 @@ from scipy.spatial import KDTree
 TL_DEBUG = True
 STATE_COUNT_THRESHOLD = 3
 
-MIN_TL_VISIBLE_DISTANCE = 1 # Minimal TL distance when it's can be visible
-MAX_TL_VISIBLE_DISTANCE = 150 # MAximal TL distance when it's can be visible
+MIN_TL_VISIBLE_DISTANCE = 0.1 # Minimal TL distance when it's can be visible
+MAX_TL_VISIBLE_DISTANCE = 300 # Maximal TL distance when it's can be visible
 MAX_STOPLINE_DISTANCE = 50 # Maximal distance between stopline and traffic light
 NORMAL_STOPLINE_DISTANCE = 15 # Normal distance between stopline and traffic light
 
@@ -177,10 +177,10 @@ class TLDetector(object):
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         #Get classification
-        cur_tl_state = self.light_classifier.get_classification(cv_image, light)
+        cur_tl_state = self.light_classifier.get_classification(cv_image)
 
-        # TODO: Remove when classifier to be implemented
-        #if cur_tl_state == TrafficLight.UNKNOWN:
+        # For test purpose only, works on simulator only
+        #if (cur_tl_state == TrafficLight.UNKNOWN) and bool(light):
         #    cur_tl_state = light.state
 
         return cur_tl_state
@@ -201,6 +201,8 @@ class TLDetector(object):
 
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
+
+        state = self.get_light_state(None)
         
         if self.is_initialized and bool(self.pose):
             # Waypoint corresponding to car position 
@@ -238,7 +240,7 @@ class TLDetector(object):
                             line_wp_idx = line_wp_idx - 1
 
             if line_wp_idx >= 0:
-                state = self.get_light_state(closest_light)
+                #state = self.get_light_state(closest_light)
 
                 if TL_DEBUG:
                     if state == TrafficLight.UNKNOWN:

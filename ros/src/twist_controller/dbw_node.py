@@ -84,7 +84,7 @@ class DBWNode(object):
                     target_dx = self.target_velocity.twist.linear.x,
                     target_dyaw = self.target_velocity.twist.angular.z,
                     current_dx = self.hero_velocity.twist.linear.x,
-                    current_dyaw =self.hero_velocity.twist.angular.z,
+                    current_dyaw = self.hero_velocity.twist.angular.z,
                     dbw_status = self.dbw_status)
 
                 if self.dbw_status and correct_data:

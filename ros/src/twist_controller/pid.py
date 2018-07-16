@@ -7,7 +7,7 @@ class PIDController(object):
         kd, # Differential factor
         mn, # Minimal value of the regulator
         mx, # Maximal value of the regulator
-        int_buffer_size # Size of the integral buffer
+        integral_period_sec # Size of the integral buffer
         ):
 
         self.kp = kp
@@ -15,22 +15,27 @@ class PIDController(object):
         self.kd = kd
         self.mn = mn
         self.mx = mx
-        self.int_buffer_size = int_buffer_size
+        self.integral_period_sec = integral_period_sec
 
         self.last_error = 0.0
         self.int_val = 0.0
+        self.int_time = 0.0
         self.int_buff = []
 
     def reset(self):
         self.int_val = 0.0
+        self.int_time = 0.0
         self.int_buff = []
 
     def step(self, error, dt):
         self.int_val += error * dt
+        self.int_time += dt
+
         self.int_buff.append((error, dt))
-        while len(self.int_buff) > self.int_buffer_size:
+        while (self.int_time > self.integral_period_sec) and (len(self.int_buff) > 0):
             tmp_error, tmp_dt = self.int_buff[0]
             self.int_val -= tmp_error * tmp_dt
+            self.int_time -= tmp_dt
 
             del self.int_buff[0]
 
