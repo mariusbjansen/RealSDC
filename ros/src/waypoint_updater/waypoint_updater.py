@@ -27,7 +27,7 @@ LOOKAHEAD_WPS = 50 # Number of waypoints we will publish. You can change this nu
 FINAL_WP_PUBLISH_FREQ = 50 # Frequency of publishing of final waypoints
 MIN_VELOCITY_VALUE = 2.0 # Minimal velocity to be equal to 0.
 
-STOP_WAYPOINT_PASS_LIMIT = 10 # Maximal number to waypoints bassed behind stop line to recognize it as passed
+STOP_WAYPOINT_PASS_LIMIT = 3 # Maximal number to waypoints bassed behind stop line to recognize it as passed
 DECELERATION_LOOKAHEAD_WPS_MIN = 20 # Minimal number of waypoint ahead to start plan deceleration
 DECELERATION_LOOKAHEAD_ALFA = 0.35 # Define minimal distance to start calc deceleration, in dependance from vehicle velocity
 DECELERATION_POWER_SLOW = 0.3 # Define function of deceleration
@@ -125,7 +125,7 @@ class WaypointUpdater(object):
             min_decel_dist = int(DECELERATION_LOOKAHEAD_ALFA * (calc_vel ** 1.5))
             cur_dist = self.distance(self.base_waypoints, from_idx, stop_idx)
 
-            if (self.stopline_waypoint_idx < 0) or ((cur_dist > min_decel_dist) and ((stop_idx - from_idx) > DECELERATION_LOOKAHEAD_WPS_MIN)):
+            if (self.stopline_waypoint_idx < 0) or ((from_idx - self.stopline_waypoint_idx) >= STOP_WAYPOINT_PASS_LIMIT) or ((cur_dist > min_decel_dist) and ((stop_idx - from_idx) > DECELERATION_LOOKAHEAD_WPS_MIN)):
                 upd_lane.waypoints = self.base_waypoints[from_idx:(from_idx + LOOKAHEAD_WPS)]
 
                 if (from_idx - self.stopline_waypoint_idx) >= STOP_WAYPOINT_PASS_LIMIT:
@@ -136,7 +136,7 @@ class WaypointUpdater(object):
         return upd_lane
 
     def _velocity_calc(self, dist, pow):
-        return ((self.last_stop_from_vel - MIN_VELOCITY_VALUE) * (dist / self.last_stop_from_distance)**pow + MIN_VELOCITY_VALUE)
+        return ((self.last_stop_from_vel - MIN_VELOCITY_VALUE) * max(0, dist / self.last_stop_from_distance)**pow + MIN_VELOCITY_VALUE)
 
     #added by arm041
     def decelerate(self, from_idx, stop_idx):
@@ -154,10 +154,11 @@ class WaypointUpdater(object):
             self.last_stop_from_vel = self.base_waypoints[from_idx].twist.twist.linear.x
             self.decel_pow = DECELERATION_POWER_SLOW
 
-        if cur_vel > self._velocity_calc(cur_dist, DECELERATION_POWER_NORM):
-            self.decel_pow = DECELERATION_POWER_FAST
-        elif cur_vel < self._velocity_calc(cur_dist, DECELERATION_POWER_FAST):
-            self.decel_pow = DECELERATION_POWER_SLOW
+        if self.last_stop_from_distance > 0:
+            if cur_vel > self._velocity_calc(cur_dist, DECELERATION_POWER_NORM):
+                self.decel_pow = DECELERATION_POWER_FAST
+            elif cur_vel < self._velocity_calc(cur_dist, DECELERATION_POWER_FAST):
+                self.decel_pow = DECELERATION_POWER_SLOW
 
         temp = []
         for idx in range(from_idx, to_idx + 1):

@@ -3,6 +3,7 @@ import rospy, rospkg
 import tensorflow as tf
 import numpy as np
 import cv2
+import math
 import os
 from datetime import datetime
 
@@ -25,7 +26,7 @@ model_depth = 2
 # class of traffic light (no need to change)
 CLASS_TRAFFIC_LIGHT = 10
 # confidence threshold when to accept/reject traffic light match
-THRESHOLD_SCORE = 0.0
+THRESHOLD_SCORE = 0.025
 
 ## color classification
 # reminder HSV (Hue, Saturation, Value)
@@ -104,7 +105,7 @@ class TLClassifier(object):
                 except:
                     pass
 
-        self.hist_clache = cv2.createCLAHE(clipLimit = 1.0, tileGridSize = (48, 48))
+        self.hist_clahe = cv2.createCLAHE(clipLimit = 1.0, tileGridSize = (48, 48))
 
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
@@ -133,10 +134,10 @@ class TLClassifier(object):
             cv2.imwrite(path, image)
 
         # Image color correction
-        image_yuv = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
-        image_yuv[:,:,0] = self.hist_clache.apply(image_yuv[:,:,0])
-        #image_yuv[:,:,0] = cv2.equalizeHist(image_yuv[:,:,0])
-        image = cv2.cvtColor(image_yuv, cv2.COLOR_YUV2BGR)
+        #image = self.apply_clahe(image)
+        image = self.color_correction(image, 1.0)
+        image = self.gamma_correction(image)
+        image = cv2.GaussianBlur(image, (7, 7), 0)
 
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         if TRAINING:
@@ -173,7 +174,6 @@ class TLClassifier(object):
                     cv2.rectangle(img_boxed, (left_x, left_y), (right_x, right_y), (255, 255, 255), 3)
 
                 sub_img = self.get_sub_image(img_rgb, cur_box, model_data_shape)
-                #sub_img = self.get_sub_image(image_yuv, cur_box, model_data_shape)
                 sub_img = (sub_img - 128.0) / 255.0
 
                 x_data[idx] = sub_img
@@ -371,3 +371,54 @@ class TLClassifier(object):
       if sum_yellow >= sum_green:
         return TrafficLight.YELLOW
       return TrafficLight.GREEN
+
+    def color_correction(self, image, percent, channel_idx = -1):
+        half_percent = percent / 200.0
+        height, width, channels_num = image.shape[:3]
+        vec_size = width * height
+
+        image_res = image.copy()
+
+        for idx in range(channels_num):
+            if (channel_idx < 0) or (idx == channel_idx):
+                channel = image_res[:,:,idx]
+                intens_sorted = np.sort(channel.reshape(vec_size))
+                intens_num = intens_sorted.shape[0] - 1
+
+                low_val  = intens_sorted[int(math.floor(intens_num * half_percent))]
+                high_val = intens_sorted[int(math.ceil(intens_num * (1.0 - half_percent)))]
+
+                channel[channel < low_val] = low_val
+                channel[channel > high_val] = high_val
+
+                channel = cv2.normalize(channel, channel.copy(), alpha = 0, beta = 255, norm_type = cv2.NORM_MINMAX)
+
+                image_res[:,:,idx] = channel
+
+        return image_res
+
+    def gamma_correction(self, image):
+        image_lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        intens = image_lab[:,:,0] / 255.0
+        lum_avg = np.average(intens)
+
+        try:
+            if (lum_avg > 0) and (lum_avg < 1):
+                gamma = -1.0 / np.log2(lum_avg)
+            else:
+                gamma = 1.0
+        except:
+            gamma = 1.0
+
+        image_lab[:,:,0] = np.power(intens, gamma) * 255.0
+
+        image_res = cv2.cvtColor(image_lab, cv2.COLOR_LAB2BGR)
+
+        return image_res
+
+    def apply_clahe(self, image):
+        image_lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        image_lab[:,:,0] = self.hist_clahe.apply(image_lab[:,:,0])
+        image_res = cv2.cvtColor(image_lab, cv2.COLOR_LAB2BGR)
+
+        return image_res
