@@ -1,2 +1,2 @@
-model_checkpoint_path: "/home/student/RealSDC/ros/src/tl_detector/light_classification/deep_model/deep_model"
-all_model_checkpoint_paths: "/home/student/RealSDC/ros/src/tl_detector/light_classification/deep_model/deep_model"
+model_checkpoint_path: "deep_model"
+all_model_checkpoint_paths: "deep_model"

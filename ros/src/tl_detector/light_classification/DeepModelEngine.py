@@ -78,7 +78,7 @@ class DeepModelEngine:
         return (float(total_accuracy) / float(num_examples), float(total_loss) / float(num_examples))
 
     def _save_model(self, session):
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(save_relative_paths = True)
         saver.save(session, self.storage_dir + '/' + self.storage_file_name)
 
     def _load_model(self, session):
@@ -175,6 +175,12 @@ class DeepModelEngine:
                     print()
 
         return validation_accuracy
+
+    def repack_model(self):
+        with self.graph.as_default():
+            with tf.Session() as session:
+                self._load_model(session)
+                self._save_model(session)
 
     def model_precision_recall(self, data_valid):
         precision_recall_dict = {idx : (0, 0, 0) for idx in range(self.class_num)}
